@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "SurveyApp",
+    "slug": "surveyapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "surveyapp",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.surveyapp.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F3D2E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.surveyapp.mobile",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-image-picker"
+    ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#0F3D2E"
+    },
+    "extra": {
+      "supabaseUrl": "https://xaeilrwacevfemvrvvmv.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhZWlscndhY2V2ZmVtdnJ2dm12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjgwNTMsImV4cCI6MjEwMTM0NDA1M30.Grn0H-Ixg8hDOCgrCHv9FaD2AdoL37JE9ZaD85X3OzA"
+    }
+  }
+}
