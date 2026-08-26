@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
+  FlatList,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -106,6 +109,8 @@ export const ReportsScreen: React.FC = () => {
   const [period, setPeriod] = useState(30);
   const [chartType, setChartType] = useState<ChartType>('Barras');
   const [exporting, setExporting] = useState(false);
+  const [surveyModalVisible, setSurveyModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: surveys = [] } = useQuery({
     queryKey: ['surveys'],
@@ -202,26 +207,90 @@ export const ReportsScreen: React.FC = () => {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: c.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Survey Selector */}
+      {/* Survey Selector Dropdown */}
       <Card>
         <Text style={[typography.overline, { color: c.textSecondary, marginBottom: spacing[3] }]}>PESQUISA</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {surveys.map((s) => (
-            <TouchableOpacity
-              key={s.id}
-              style={[styles.surveyChip, {
-                backgroundColor: selectedSurveyId === s.id ? c.primaryDark : c.inputBg,
-                borderColor: selectedSurveyId === s.id ? c.primaryDark : c.border,
-              }]}
-              onPress={() => setSelectedSurveyId(s.id)}
-            >
-              <Text style={[typography.bodySmall, { color: selectedSurveyId === s.id ? '#FFF' : c.textPrimary }]} numberOfLines={1}>
-                {s.title}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <TouchableOpacity
+          style={[styles.dropdownBtn, { backgroundColor: c.inputBg, borderColor: c.border }]}
+          onPress={() => { setSearchQuery(''); setSurveyModalVisible(true); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[typography.body, { color: selectedSurveyId ? c.textPrimary : c.textSecondary, flex: 1 }]} numberOfLines={1}>
+            {selectedSurveyId ? surveys.find(s => s.id === selectedSurveyId)?.title ?? 'Selecionar pesquisa' : 'Selecionar pesquisa'}
+          </Text>
+          <Text style={{ color: c.textSecondary, fontSize: 16 }}>▾</Text>
+        </TouchableOpacity>
       </Card>
+
+      {/* Survey Picker Modal */}
+      <Modal
+        visible={surveyModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSurveyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: c.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: c.divider }]}>
+              <Text style={[typography.h3, { color: c.textPrimary, flex: 1 }]}>Selecionar Pesquisa</Text>
+              <TouchableOpacity onPress={() => setSurveyModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={{ fontSize: 22, color: c.textSecondary }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.searchBox, { backgroundColor: c.inputBg, borderColor: c.border }]}>
+              <Text style={{ color: c.textSecondary, marginRight: spacing[2] }}>🔍</Text>
+              <TextInput
+                style={[typography.body, { flex: 1, color: c.textPrimary, padding: 0 }]}
+                placeholder="Buscar pesquisa..."
+                placeholderTextColor={c.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Text style={{ color: c.textSecondary, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <FlatList
+              data={surveys.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => {
+                const isSelected = item.id === selectedSurveyId;
+                return (
+                  <TouchableOpacity
+                    style={[styles.modalItem, { borderBottomColor: c.divider, backgroundColor: isSelected ? c.accentLight : 'transparent' }]}
+                    onPress={() => { setSelectedSurveyId(item.id); setSurveyModalVisible(false); }}
+                    activeOpacity={0.6}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typography.body, { color: isSelected ? c.primaryDark : c.textPrimary, fontWeight: isSelected ? '600' : '400' }]} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      {item.description ? (
+                        <Text style={[typography.caption, { color: c.textSecondary, marginTop: 2 }]} numberOfLines={1}>
+                          {item.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {isSelected && <Text style={{ color: c.primaryDark, fontSize: 18, marginLeft: spacing[3] }}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <Text style={[typography.body, { color: c.textSecondary, textAlign: 'center', padding: spacing[8] }]}>
+                  Nenhuma pesquisa encontrada.
+                </Text>
+              }
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 380 }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {selectedSurvey && (
         <>
@@ -379,7 +448,53 @@ export const ReportsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: spacing[4], paddingBottom: spacing[12] },
-  surveyChip: { borderWidth: 1, borderRadius: borderRadius.lg, paddingVertical: spacing[2], paddingHorizontal: spacing[4], marginRight: spacing[2], maxWidth: 180 },
+  // Dropdown
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    minHeight: 44,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    paddingBottom: spacing[6],
+    ...shadow.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[5],
+    borderBottomWidth: 1,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    marginHorizontal: spacing[5],
+    marginVertical: spacing[3],
+    minHeight: 42,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[5],
+    borderBottomWidth: 1,
+  },
+  // Others
   metricsRow: { flexDirection: 'row', marginTop: spacing[3] },
   periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   periodBtn: { borderWidth: 1, borderRadius: borderRadius.md, paddingVertical: spacing[2], paddingHorizontal: spacing[4] },

@@ -219,13 +219,14 @@ export const CreateSurveyScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const queryClient = useQueryClient();
-  const profile = useAuthStore((s) => s.profile);
+  const { profile, session } = useAuthStore();
+  const user = session?.user;
   const surveyId = route.params?.surveyId;
   const [questions, setQuestions] = useState<LocalQuestion[]>([newQuestion()]);
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
-  const { control, handleSubmit, formState: { errors }, watch, reset } = useForm<SurveyMeta>({
+  const { control, handleSubmit, formState: { errors }, watch, reset, getValues, trigger, setValue } = useForm<SurveyMeta>({
     resolver: zodResolver(surveyMetaSchema),
     defaultValues: { type: 'satisfacao', is_anonymous: false, require_identification: false },
   });
@@ -273,15 +274,23 @@ export const CreateSurveyScreen: React.FC = () => {
   }, [existingSurvey, reset]);
 
   const saveDraft = async (data: SurveyMeta, publish = false) => {
-    if (!profile) return;
+    console.log('[saveDraft] iniciando, surveyId=', surveyId, 'publish=', publish);
+    // Usa profile do store ou fallback nos metadados do usuário autenticado
+    const orgId = profile?.org_id ?? user?.user_metadata?.org_id;
+    const userId = profile?.id ?? user?.id;
+
+    if (!userId || !orgId) {
+      Alert.alert('Erro', `Dados do usuário incompletos (org_id=${orgId}, userId=${userId}). Tente sair e entrar novamente.`);
+      return;
+    }
     try {
       publish ? setPublishing(true) : setSavingDraft(true);
 
       let id = surveyId;
       if (!id) {
         const survey = await createSurvey({
-          org_id: profile.org_id,
-          created_by: profile.id,
+          org_id: orgId,
+          created_by: userId,
           title: data.title,
           description: data.description ?? null,
           type: data.type,
@@ -312,24 +321,46 @@ export const CreateSurveyScreen: React.FC = () => {
       }));
       await upsertQuestions(questionRows);
 
-      if (publish) {
-        await publishSurvey(id!, data.title, existingSurvey?.public_slug);
-        Alert.alert('🎉 Pesquisa publicada!', 'Sua pesquisa está ativa e o link público foi gerado.');
-        navigation.navigate('SurveysTab', { screen: 'SurveyDetail', params: { id } });
-      } else {
-        Alert.alert('Rascunho salvo', 'Sua pesquisa foi salva como rascunho.');
-      }
-
       queryClient.invalidateQueries({ queryKey: ['surveys'] });
       if (id) {
         queryClient.invalidateQueries({ queryKey: ['survey', id] });
       }
+
+      if (publish) {
+        await publishSurvey(id!, data.title, existingSurvey?.public_slug);
+        Alert.alert('🎉 Pesquisa publicada!', 'Sua pesquisa está ativa e o link público foi gerado.', [
+          { text: 'OK', onPress: () => navigation.navigate('SurveysTab', { screen: 'SurveyDetail', params: { id } }) },
+        ]);
+      } else {
+        Alert.alert('✅ Salvo!', 'Sua pesquisa foi salva com sucesso.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
     } catch (err: any) {
-      Alert.alert('Erro', err.message ?? 'Não foi possível salvar a pesquisa.');
+      Alert.alert('Erro ao salvar', err.message ?? 'Não foi possível salvar a pesquisa.');
     } finally {
       setSavingDraft(false);
       setPublishing(false);
     }
+  };
+
+  const onValidationError = (errs: any) => {
+    const firstMsg = Object.values(errs)?.[0] as any;
+    Alert.alert('Campos inválidos', firstMsg?.message ?? 'Preencha todos os campos obrigatórios.');
+  };
+
+  const handleSave = async (publish: boolean) => {
+    console.log('[handleSave] chamado, publish=', publish, 'profile=', !!profile);
+    const isValid = await trigger();
+    console.log('[handleSave] isValid=', isValid, 'errors=', JSON.stringify(errors));
+    if (!isValid) {
+      const errs = errors as any;
+      const firstMsg = Object.values(errs)?.[0] as any;
+      Alert.alert('Campos inválidos', firstMsg?.message ?? 'Preencha o título da pesquisa (mínimo 3 caracteres).');
+      return;
+    }
+    const data = getValues();
+    await saveDraft(data, publish);
   };
 
   const TYPE_LABELS: Record<string, string> = {
@@ -339,6 +370,29 @@ export const CreateSurveyScreen: React.FC = () => {
   };
 
   const currentType = watch('type');
+
+  // Modo de identidade — calculado fora do JSX para evitar crash no Android
+  const IDENTITY_MODES = [
+    { value: 'anonimo',     emoji: '🔒', label: 'Anônimo',                   desc: 'Nenhum dado do respondente é salvo' },
+    { value: 'opcional',    emoji: '👤', label: 'Identificação opcional',    desc: 'Solicita nome/e-mail, mas permite pular' },
+    { value: 'obrigatorio', emoji: '📋', label: 'Identificação obrigatória', desc: 'Nome/e-mail exigidos antes de responder' },
+  ] as const;
+  const watchAnonymous = watch('is_anonymous');
+  const watchRequireId  = watch('require_identification');
+  const currentIdentityMode = watchAnonymous ? 'anonimo' : watchRequireId ? 'obrigatorio' : 'opcional';
+
+  const handleIdentityMode = (mode: 'anonimo' | 'opcional' | 'obrigatorio') => {
+    if (mode === 'anonimo') {
+      setValue('is_anonymous', true);
+      setValue('require_identification', false);
+    } else if (mode === 'opcional') {
+      setValue('is_anonymous', false);
+      setValue('require_identification', false);
+    } else {
+      setValue('is_anonymous', false);
+      setValue('require_identification', true);
+    }
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -425,23 +479,31 @@ export const CreateSurveyScreen: React.FC = () => {
           <Text style={[typography.overline, { color: c.textSecondary, marginBottom: spacing[4] }]}>
             CONFIGURAÇÕES
           </Text>
-          <View style={styles.settingRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[typography.labelLarge, { color: c.textPrimary }]}>Anonimato</Text>
-              <Text style={[typography.caption, { color: c.textSecondary }]}>Ocultar identidade dos respondentes</Text>
-            </View>
-            <Controller control={control} name="is_anonymous" render={({ field: { onChange, value } }) => (
-              <Switch value={value} onValueChange={onChange} trackColor={{ false: c.border, true: c.accent }} thumbColor="#FFF" />
-            )} />
-          </View>
-          <View style={[styles.settingRow, { marginTop: spacing[3] }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[typography.labelLarge, { color: c.textPrimary }]}>Pedir identificação (link público)</Text>
-              <Text style={[typography.caption, { color: c.textSecondary }]}>Solicitar nome/e-mail antes de responder</Text>
-            </View>
-            <Controller control={control} name="require_identification" render={({ field: { onChange, value } }) => (
-              <Switch value={value} onValueChange={onChange} trackColor={{ false: c.border, true: c.accent }} thumbColor="#FFF" />
-            )} />
+          <Text style={[typography.label, { color: c.textSecondary, marginBottom: spacing[3] }]}>Modo de identidade</Text>
+          <View style={{ gap: spacing[2] }}>
+            {IDENTITY_MODES.map((mode) => {
+              const selected = currentIdentityMode === mode.value;
+              return (
+                <TouchableOpacity
+                  key={mode.value}
+                  style={[styles.modeOption, {
+                    backgroundColor: selected ? c.accentLight : c.inputBg,
+                    borderColor: selected ? c.accent : c.border,
+                  }]}
+                  onPress={() => handleIdentityMode(mode.value)}
+                >
+                  <View style={[styles.modeRadio, { borderColor: selected ? c.accent : c.border }]}>
+                    {selected && <View style={[styles.modeRadioDot, { backgroundColor: c.accent }]} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typography.labelLarge, { color: selected ? c.primaryDark : c.textPrimary }]}>
+                      {mode.emoji} {mode.label}
+                    </Text>
+                    <Text style={[typography.caption, { color: c.textSecondary }]}>{mode.desc}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Card>
 
@@ -450,8 +512,8 @@ export const CreateSurveyScreen: React.FC = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelBtn}>
             <Text style={[typography.body, { color: c.textSecondary }]}>← Cancelar</Text>
           </TouchableOpacity>
-          <Button label="Salvar rascunho" variant="outline" loading={savingDraft} onPress={handleSubmit((d) => saveDraft(d, false))} style={{ flex: 1, marginRight: spacing[3] }} />
-          <Button label="Publicar pesquisa ›" loading={publishing} onPress={handleSubmit((d) => saveDraft(d, true))} style={{ flex: 1.2 }} />
+          <Button label="Salvar rascunho" variant="outline" loading={savingDraft} onPress={() => handleSave(false)} style={{ flex: 1, marginRight: spacing[3] }} />
+          <Button label="Publicar pesquisa ›" loading={publishing} onPress={() => handleSave(true)} style={{ flex: 1.2 }} />
         </View>
       </ScrollView>
     </GestureHandlerRootView>
@@ -479,6 +541,9 @@ const styles = StyleSheet.create({
   npsBtn: { width: 36, height: 36, borderRadius: borderRadius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: spacing[1] },
   requiredRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modeOption: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: borderRadius.lg, padding: spacing[3], gap: spacing[3] },
+  modeRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  modeRadioDot: { width: 10, height: 10, borderRadius: 5 },
   addQuestionBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: borderRadius.xl, padding: spacing[4], alignItems: 'center', marginTop: spacing[2] },
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[5] },
   cancelBtn: { paddingRight: spacing[3] },

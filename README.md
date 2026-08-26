@@ -58,7 +58,7 @@ Ação voltada para aplicação que ainda não possui o SupaBase configurado. No
 2. Atualize o arquivo `app.json` no nó `extra` com as suas chaves do Supabase:
 
 ```json
-"extra": {
+"extra": {  
   "supabaseUrl": "SUA_URL_AQUI",
   "supabaseAnonKey": "SUA_ANON_KEY_AQUI"
 }

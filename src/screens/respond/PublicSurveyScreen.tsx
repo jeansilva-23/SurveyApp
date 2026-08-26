@@ -171,7 +171,7 @@ export const PublicSurveyScreen: React.FC = () => {
   const [respondentEmail, setRespondentEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [step, setStep] = useState<'identify' | 'respond'>('identify');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const { data: survey, isLoading } = useQuery({
     queryKey: ['publicSurvey', slug],
@@ -181,7 +181,20 @@ export const PublicSurveyScreen: React.FC = () => {
 
   const questions = ((survey as any)?.survey_questions ?? []) as SurveyQuestion[];
 
+  const isAnonymous = (survey as any)?.is_anonymous ?? false;
+  const requireId = survey?.require_identification ?? false;
+  const showIdentification = !isAnonymous && !profile;
+
   const handleSubmit = async () => {
+    setErrorMsg('');
+    // Valida identificação obrigatória antes de enviar
+    if (showIdentification && requireId && !respondentName.trim()) {
+      setErrorMsg('Por favor, informe seu nome na seção de Identificação antes de enviar.');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Campo obrigatório', 'Por favor, informe seu nome antes de enviar.');
+      }
+      return;
+    }
     try {
       setSubmitting(true);
       const answerList = Object.entries(answers).map(([question_id, answer_value]) => ({
@@ -189,16 +202,18 @@ export const PublicSurveyScreen: React.FC = () => {
         answer_value,
       }));
 
+      // Se anônima, não enviar nenhum dado identificador
       await submitResponse(
         survey!.id,
         answerList,
-        profile?.id ?? null,
-        respondentName || undefined,
-        respondentEmail || undefined,
+        isAnonymous ? null : (profile?.id ?? null),
+        isAnonymous ? undefined : (respondentName || undefined),
+        isAnonymous ? undefined : (respondentEmail || undefined),
         'web'
       );
       setSubmitted(true);
     } catch (err: any) {
+      setErrorMsg(err.message ?? 'Tente novamente.');
       Alert.alert('Erro ao enviar', err.message ?? 'Tente novamente.');
     } finally {
       setSubmitting(false);
@@ -255,24 +270,25 @@ export const PublicSurveyScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* Identification step */}
-        {survey.require_identification && step === 'identify' && !profile && (
-          <Card>
-            <Text style={[typography.h3, { color: c.textPrimary, marginBottom: spacing[2] }]}>Identificação (opcional)</Text>
+
+        {/* Card de identificação — aparece no topo, junto com as perguntas */}
+        {showIdentification && (
+          <Card style={{ marginBottom: spacing[3] }}>
+            <Text style={[typography.h3, { color: c.textPrimary, marginBottom: spacing[2] }]}>
+              {requireId ? 'Identificação' : 'Identificação (opcional)'}
+            </Text>
             <Text style={[typography.body, { color: c.textSecondary, marginBottom: spacing[4] }]}>
-              Informe seus dados ou pule para responder anonimamente.
+              {requireId
+                ? 'Informe seus dados para continuar.'
+                : 'Informe seus dados ou deixe em branco para responder anonimamente.'}
             </Text>
             <Input label="Nome" placeholder="Seu nome" value={respondentName} onChangeText={setRespondentName} />
             <Input label="E-mail" placeholder="seu@email.com" value={respondentEmail} onChangeText={setRespondentEmail} keyboardType="email-address" autoCapitalize="none" />
-            <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-              <Button label="Pular" variant="outline" onPress={() => setStep('respond')} style={{ flex: 1 }} />
-              <Button label="Continuar" onPress={() => setStep('respond')} style={{ flex: 1 }} />
-            </View>
           </Card>
         )}
 
-        {/* Questions */}
-        {(step === 'respond' || !survey.require_identification || profile) && questions.map((question, i) => (
+        {/* Perguntas */}
+        {questions.map((question, i) => (
           <Card key={question.id} style={{ marginBottom: spacing[3] }}>
             <View style={styles.questionHeader}>
               <Text style={[typography.overline, { color: c.textSecondary }]}>Pergunta {i + 1}</Text>
@@ -307,9 +323,12 @@ export const PublicSurveyScreen: React.FC = () => {
           </Card>
         ))}
 
-        {(step === 'respond' || !survey.require_identification || profile) && (
-          <Button label={submitting ? 'Enviando...' : 'Enviar respostas'} fullWidth loading={submitting} onPress={handleSubmit} style={{ marginTop: spacing[2] }} />
-        )}
+        {errorMsg ? (
+          <Text style={[typography.body, { color: c.error, marginBottom: spacing[2], textAlign: 'center', fontWeight: 'bold' }]}>
+            {errorMsg}
+          </Text>
+        ) : null}
+        <Button label={submitting ? 'Enviando...' : 'Enviar respostas'} fullWidth loading={submitting} onPress={handleSubmit} style={{ marginTop: spacing[2] }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
