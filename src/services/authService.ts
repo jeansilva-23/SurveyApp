@@ -52,9 +52,16 @@ export const signInWithGoogle = async () => {
     const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
     if (res.type === 'success' && res.url) {
       // Cria a sessão a partir da URL retornada com o token
-      const urlParams = new URL(res.url.replace('#', '?')).searchParams;
-      const accessToken = urlParams.get('access_token');
-      const refreshToken = urlParams.get('refresh_token');
+      // Avoid `new URL()` in React Native which crashes on custom schemes
+      const hashOrQuery = res.url.split('#')[1] || res.url.split('?')[1] || '';
+      const params: Record<string, string> = {};
+      hashOrQuery.split('&').forEach((pair) => {
+        const [key, value] = pair.split('=');
+        if (key && value) params[key] = decodeURIComponent(value);
+      });
+      
+      const accessToken = params['access_token'];
+      const refreshToken = params['refresh_token'];
       if (accessToken && refreshToken) {
         await supabase.auth.setSession({
           access_token: accessToken,
