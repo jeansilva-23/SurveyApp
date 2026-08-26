@@ -21,7 +21,7 @@ import { Card, StatusBadge } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { getSurveyById, updateSurvey } from '../../../services/surveyService';
 
-const PUBLIC_BASE_URL = __DEV__ ? 'http://localhost:8081/survey' : 'https://surveyapp.io/survey';
+const PUBLIC_BASE_URL = __DEV__ ? 'http://localhost:8081/survey' : (process.env.EXPO_PUBLIC_APP_URL || 'https://survey-app-vwhs-psi.vercel.app') + '/survey';
 
 export const SurveyDetailScreen: React.FC = () => {
   const { c } = useTheme();

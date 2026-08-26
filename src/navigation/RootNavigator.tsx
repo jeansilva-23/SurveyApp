@@ -18,7 +18,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 // Deep link configuration for Expo Web + mobile
 const linking = {
-  prefixes: ['surveyapp://', 'https://surveyapp.io', 'http://localhost:8081'],
+  prefixes: ['surveyapp://', process.env.EXPO_PUBLIC_APP_URL || 'https://survey-app-vwhs-psi.vercel.app', 'http://localhost:8081'],
   config: {
     screens: {
       Main: {
