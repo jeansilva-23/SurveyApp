@@ -20,6 +20,7 @@ import { spacing, borderRadius, shadow } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { Select } from '../../components/common/Select';
 import { getSurveys, getResponses, getQuestions } from '../../services/surveyService';
 
 // ---- Simple bar chart (SVG) ----
@@ -310,31 +311,24 @@ export const ReportsScreen: React.FC = () => {
 
           {/* Period + Chart type selectors */}
           <Card style={{ marginTop: spacing[3] }}>
-            <Text style={[typography.overline, { color: c.textSecondary, marginBottom: spacing[3] }]}>PERÍODO</Text>
-            <View style={styles.periodRow}>
-              {PERIODS.map((p) => (
-                <TouchableOpacity
-                  key={p.days}
-                  style={[styles.periodBtn, { backgroundColor: period === p.days ? c.primaryDark : c.inputBg, borderColor: period === p.days ? c.primaryDark : c.border }]}
-                  onPress={() => setPeriod(p.days)}
-                >
-                  <Text style={[typography.labelSmall, { color: period === p.days ? '#FFF' : c.textSecondary }]}>{p.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Select
+              label="PERÍODO"
+              options={PERIODS.map(p => ({ label: p.label, value: String(p.days) }))}
+              value={String(period)}
+              onChange={(val) => setPeriod(Number(val))}
+              style={{ marginBottom: spacing[4] }}
+            />
 
-            <Text style={[typography.overline, { color: c.textSecondary, marginBottom: spacing[3], marginTop: spacing[4] }]}>TIPO DE GRÁFICO</Text>
-            {CHART_TYPES.map((ct) => (
-              <TouchableOpacity
-                key={ct}
-                style={[styles.chartTypeBtn, { backgroundColor: chartType === ct ? c.accentLight : 'transparent', borderColor: chartType === ct ? c.accent : c.border }]}
-                onPress={() => setChartType(ct)}
-              >
-                <Text style={[typography.body, { color: chartType === ct ? c.primaryDark : c.textPrimary }]}>
-                  {ct === 'Vertical' ? '📊' : ct === 'Pizza' ? '🥧' : '📑'} {ct}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <Select
+              label="TIPO DE GRÁFICO"
+              options={CHART_TYPES.map(ct => ({
+                label: ct,
+                value: ct,
+                emoji: ct === 'Vertical' ? '📊' : ct === 'Pizza' ? '🥧' : '📑'
+              }))}
+              value={chartType}
+              onChange={(val) => setChartType(val as ChartType)}
+            />
 
             <Button label="⬇  Exportar relatório" loading={exporting} fullWidth onPress={handleExportPDF} style={{ marginTop: spacing[5] }} />
             <Button label="Exportar CSV" variant="outline" fullWidth onPress={handleExportCSV} style={{ marginTop: spacing[2] }} />

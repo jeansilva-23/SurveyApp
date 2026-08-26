@@ -22,6 +22,7 @@ import { typography } from '../../../theme/typography';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { Input } from '../../../components/common/Input';
+import { Select } from '../../../components/common/Select';
 import { createSurvey, updateSurvey, upsertQuestions, getSurveyById, publishSurvey } from '../../../services/surveyService';
 import { useAuthStore } from '../../../store/authStore';
 import { QuestionType, SurveyQuestion } from '../../../types/database.types';
@@ -108,26 +109,13 @@ const QuestionEditor: React.FC<{
         </View>
       </View>
 
-      {/* Question type tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeTabs}>
-        {QUESTION_TYPES.map((qt) => (
-          <TouchableOpacity
-            key={qt.value}
-            style={[
-              styles.typeTab,
-              {
-                backgroundColor: question.type === qt.value ? c.primaryDark : c.inputBg,
-                borderColor: question.type === qt.value ? c.primaryDark : c.border,
-              },
-            ]}
-            onPress={() => onUpdate({ ...question, type: qt.value, options: qt.value === 'unica_escolha' || qt.value === 'multipla_escolha' ? ['', ''] : [] })}
-          >
-            <Text style={[typography.labelSmall, { color: question.type === qt.value ? '#FFF' : c.textSecondary }]}>
-              {qt.emoji} {qt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Question type dropdown */}
+      <Select
+        style={{ marginBottom: spacing[3] }}
+        options={QUESTION_TYPES}
+        value={question.type}
+        onChange={(val) => onUpdate({ ...question, type: val as QuestionType, options: val === 'unica_escolha' || val === 'multipla_escolha' ? ['', ''] : [] })}
+      />
 
       {/* Question title */}
       <SyncTextInput
@@ -417,26 +405,17 @@ export const CreateSurveyScreen: React.FC = () => {
           )} />
 
           {/* Type selector */}
-          <Text style={[typography.label, { color: c.textSecondary, marginBottom: spacing[2] }]}>Tipo de pesquisa</Text>
           <Controller control={control} name="type" render={({ field: { onChange, value } }) => (
-            <View style={styles.typeRow}>
-              {(['satisfacao', 'formulario', 'censo'] as const).map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.typeBtn, {
-                    backgroundColor: value === t ? c.primaryDark : c.inputBg,
-                    borderColor: value === t ? c.primaryDark : c.border,
-                    flex: 1,
-                    marginRight: t !== 'censo' ? spacing[2] : 0,
-                  }]}
-                  onPress={() => onChange(t)}
-                >
-                  <Text style={[typography.labelSmall, { color: value === t ? '#FFF' : c.textSecondary, textAlign: 'center' }]}>
-                    {TYPE_LABELS[t]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Select
+              label="Tipo de pesquisa"
+              options={[
+                { label: 'Satisfação', value: 'satisfacao' },
+                { label: 'Formulário', value: 'formulario' },
+                { label: 'Censo', value: 'censo' },
+              ]}
+              value={value}
+              onChange={onChange}
+            />
           )} />
         </Card>
 
