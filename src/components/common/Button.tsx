@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
   TouchableOpacityProps,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../theme';
@@ -45,7 +46,9 @@ export const Button: React.FC<ButtonProps> = ({
   const { c } = useTheme();
 
   const handlePress = (e: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
     onPress?.(e);
   };
 
