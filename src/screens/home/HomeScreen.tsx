@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -15,6 +17,7 @@ import { typography } from '../../theme/typography';
 import { Card, MetricCard, StatusBadge } from '../../components/common/Card';
 import { EmptyState } from '../../components/common/Mascot';
 import { getDashboardStats } from '../../services/surveyService';
+import { signOut } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { Survey } from '../../types/database.types';
 
@@ -133,6 +136,27 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const profile = useAuthStore((s) => s.profile);
 
+  const handleLogout = async () => {
+    const doLogout = async () => {
+      try {
+        await signOut();
+      } catch (e) {
+        console.error('Error signing out:', e);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Deseja realmente sair?')) {
+        doLogout();
+      }
+    } else {
+      Alert.alert('Sair', 'Deseja realmente sair?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: doLogout },
+      ]);
+    }
+  };
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardStats,
@@ -177,12 +201,12 @@ export const HomeScreen: React.FC = () => {
     >
       {/* Greeting */}
       <View style={[styles.greetingHeader, { backgroundColor: c.primary }]}>
-        <View>
+        <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
           <Text style={[typography.bodySmall, { color: '#C8E6D4' }]}>Bem-vindo de volta,</Text>
           <Text style={[typography.h1, { color: '#EAF3EE', marginTop: 2 }]}>
             {firstName} 👋
           </Text>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.createBtn, { backgroundColor: c.accent }]}
           onPress={() => navigation.navigate('CreateSurvey')}

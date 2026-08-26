@@ -184,9 +184,14 @@ describe('CreateSurveyScreen', () => {
     // Na pergunta 1, deve ter as opções de A e B se for única escolha (padrão)
     expect(screen.getByPlaceholderText('Opção 1')).toBeTruthy();
 
+    // Abre o seletor de tipo
+    await act(async () => {
+      fireEvent.press(screen.getByText(/Escolha única/));
+    });
+
     // Muda para texto curto
     await act(async () => {
-      fireEvent.press(screen.getByText('T Texto curto'));
+      fireEvent.press(screen.getByText(/Texto curto/));
     });
 
     // O input de opções não deve mais estar visível
