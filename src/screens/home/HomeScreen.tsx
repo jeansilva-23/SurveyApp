@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -135,6 +137,7 @@ export const HomeScreen: React.FC = () => {
   const { c } = useTheme();
   const navigation = useNavigation<any>();
   const profile = useAuthStore((s) => s.profile);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     const doLogout = async () => {
@@ -201,11 +204,14 @@ export const HomeScreen: React.FC = () => {
     >
       {/* Greeting */}
       <View style={[styles.greetingHeader, { backgroundColor: c.primary }]}>
-        <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => setIsMenuOpen(true)} activeOpacity={0.7}>
           <Text style={[typography.bodySmall, { color: '#C8E6D4' }]}>Bem-vindo de volta,</Text>
-          <Text style={[typography.h1, { color: '#EAF3EE', marginTop: 2 }]}>
-            {firstName} 👋
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <Text style={[typography.h1, { color: '#EAF3EE' }]}>
+              {firstName} 👋
+            </Text>
+            <Text style={{ color: '#EAF3EE', fontSize: 12, marginTop: 4 }}>▼</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.createBtn, { backgroundColor: c.accent }]}
@@ -295,6 +301,27 @@ export const HomeScreen: React.FC = () => {
           ))
         )}
       </Card>
+
+      {/* User Menu Modal */}
+      <Modal visible={isMenuOpen} transparent animationType="fade" onRequestClose={() => setIsMenuOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setIsMenuOpen(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuContainer, { backgroundColor: c.card }]}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                >
+                  <Text style={[typography.bodyLarge, { color: c.error }]}>Sair (Logout)</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </ScrollView>
   );
 };
@@ -344,5 +371,27 @@ const styles = StyleSheet.create({
   donutRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  menuContainer: {
+    marginTop: Platform.OS === 'web' ? 70 : 90,
+    marginLeft: spacing[5],
+    borderRadius: borderRadius.md,
+    padding: spacing[2],
+    minWidth: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  menuItem: {
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
   },
 });

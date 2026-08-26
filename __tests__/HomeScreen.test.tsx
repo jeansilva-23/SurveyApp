@@ -80,8 +80,14 @@ describe('HomeScreen', () => {
     
     const greetingText = screen.getByText('Test 👋');
     
+    // Abre o menu
     await act(async () => {
       fireEvent.press(greetingText);
+    });
+
+    // Clica em sair
+    await act(async () => {
+      fireEvent.press(screen.getByText('Sair (Logout)'));
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -105,9 +111,14 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
     
-    const greetingText = screen.getByText('Test 👋');
+    // Abre o menu
     await act(async () => {
-      fireEvent.press(greetingText);
+      fireEvent.press(screen.getByText('Test 👋'));
+    });
+
+    // Clica em sair
+    await act(async () => {
+      fireEvent.press(screen.getByText('Sair (Logout)'));
     });
 
     expect(mockSignOut).toHaveBeenCalled();
@@ -119,9 +130,14 @@ describe('HomeScreen', () => {
 
     render(<HomeScreen />);
     
-    const greetingText = screen.getByText('Test 👋');
+    // Abre o menu
     await act(async () => {
-      fireEvent.press(greetingText);
+      fireEvent.press(screen.getByText('Test 👋'));
+    });
+
+    // Clica em sair
+    await act(async () => {
+      fireEvent.press(screen.getByText('Sair (Logout)'));
     });
 
     expect(window.confirm).toHaveBeenCalledWith('Deseja realmente sair?');
