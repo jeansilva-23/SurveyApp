@@ -21,7 +21,7 @@ const ALLOWED_MIME_TYPES = ['application/pdf', 'text/plain', 'text/markdown'];
 
 /** URL da API Gemini (REST direto, compatível com Edge Runtime). */
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 // ---------- Prompt ----------
 
