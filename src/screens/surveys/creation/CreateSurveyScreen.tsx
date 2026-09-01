@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
@@ -24,8 +25,10 @@ import { Button } from '../../../components/common/Button';
 import { Input } from '../../../components/common/Input';
 import { Select } from '../../../components/common/Select';
 import { createSurvey, updateSurvey, upsertQuestions, getSurveyById, publishSurvey } from '../../../services/surveyService';
+import { pickFileAndGenerateSurvey } from '../../../services/aiService';
 import { useAuthStore } from '../../../store/authStore';
 import { QuestionType, SurveyQuestion } from '../../../types/database.types';
+import type { AISurveyResult } from '../../../types/ai.types';
 
 // ---- Form schemas ----
 const surveyMetaSchema = z.object({
@@ -213,6 +216,7 @@ export const CreateSurveyScreen: React.FC = () => {
   const [questions, setQuestions] = useState<LocalQuestion[]>([newQuestion()]);
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { control, handleSubmit, formState: { errors }, watch, reset, getValues, trigger, setValue } = useForm<SurveyMeta>({
     resolver: zodResolver(surveyMetaSchema),
@@ -351,6 +355,50 @@ export const CreateSurveyScreen: React.FC = () => {
     await saveDraft(data, publish);
   };
 
+  /** Gera a pesquisa a partir de um arquivo usando o Gemini via Vercel Edge Function. */
+  const handleGenerateWithAI = async () => {
+    try {
+      setIsGenerating(true);
+      const result: AISurveyResult | null = await pickFileAndGenerateSurvey();
+
+      // Usuário cancelou o seletor de arquivos
+      if (!result) return;
+
+      // Preenche os metadados da pesquisa no formulário
+      reset({
+        title: result.title,
+        description: result.description,
+        type: 'satisfacao',
+        is_anonymous: false,
+        require_identification: false,
+      });
+
+      // Converte as perguntas da IA para o formato local da tela
+      const aiQuestions: LocalQuestion[] = result.questions.map((q) => ({
+        localId: Math.random().toString(36).slice(2),
+        type: q.type,
+        title: q.title,
+        required: q.required,
+        options:
+          q.options && q.options.length > 0
+            ? q.options
+            : q.type === 'unica_escolha' || q.type === 'multipla_escolha'
+            ? ['', '']
+            : [],
+      }));
+      setQuestions(aiQuestions);
+
+      Alert.alert(
+        '✨ Pesquisa gerada!',
+        `A IA criou ${aiQuestions.length} pergunta${aiQuestions.length > 1 ? 's' : ''} sobre o tema do documento. Revise, edite se necessário e publique!`
+      );
+    } catch (err: any) {
+      Alert.alert('Erro ao gerar pesquisa', err.message || 'Não foi possível gerar a pesquisa. Tente novamente.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const TYPE_LABELS: Record<string, string> = {
     satisfacao: 'Satisfação',
     formulario: 'Formulário',
@@ -390,6 +438,40 @@ export const CreateSurveyScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ✨ Banner de Geração com IA */}
+        <TouchableOpacity
+          testID="btn-generate-ai"
+          style={[
+            styles.aiBanner,
+            {
+              backgroundColor: isGenerating ? c.accentLight : c.primaryDark,
+              opacity: isGenerating ? 0.8 : 1,
+            },
+          ]}
+          onPress={handleGenerateWithAI}
+          disabled={isGenerating}
+          activeOpacity={0.85}
+        >
+          {isGenerating ? (
+            <>
+              <ActivityIndicator color="#FFF" style={{ marginRight: spacing[3] }} />
+              <View>
+                <Text style={[typography.labelLarge, { color: c.primaryDark }]}>Processando documento...</Text>
+                <Text style={[typography.caption, { color: c.textSecondary }]}>O Gemini está lendo e criando as perguntas</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.aiEmoji}>✨</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.labelLarge, { color: '#FFF' }]}>Gerar pesquisa com Inteligência Artificial</Text>
+                <Text style={[typography.caption, { color: 'rgba(255,255,255,0.75)' }]}>Anexe um PDF ou TXT e o Gemini cria a pesquisa automaticamente</Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }}>›</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
         {/* Metadata section */}
         <Card>
           <Text style={[typography.overline, { color: c.textSecondary, marginBottom: spacing[4] }]}>
@@ -500,6 +582,16 @@ export const CreateSurveyScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  aiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: borderRadius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    gap: spacing[3],
+    ...shadow.sm,
+  },
+  aiEmoji: { fontSize: 28 },
   container: { flex: 1 },
   content: { padding: spacing[4], paddingBottom: spacing[12] },
   typeRow: { flexDirection: 'row' },

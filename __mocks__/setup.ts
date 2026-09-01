@@ -60,3 +60,19 @@ jest.mock('expo-clipboard', () => ({
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
+
+/**
+ * Mock do expo-document-picker — simula o seletor de arquivos nativo.
+ * Os testes sobrescrevem o comportamento com mockResolvedValue conforme necessário.
+ */
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn().mockResolvedValue({ canceled: true, assets: [] }),
+}));
+
+/**
+ * Mock do expo-file-system — usado na leitura dos arquivos em Base64.
+ */
+jest.mock('expo-file-system', () => ({
+  readAsStringAsync: jest.fn().mockResolvedValue('dGVzdGVCYXNlNjQ='), // "testeBase64" em base64
+  EncodingType: { Base64: 'base64', UTF8: 'utf8' },
+}));
