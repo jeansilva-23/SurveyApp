@@ -321,7 +321,7 @@ export const CreateSurveyScreen: React.FC = () => {
       if (publish) {
         await publishSurvey(id!, data.title, existingSurvey?.public_slug);
         Alert.alert('🎉 Pesquisa publicada!', 'Sua pesquisa está ativa e o link público foi gerado.', [
-          { text: 'OK', onPress: () => navigation.navigate('SurveysTab', { screen: 'SurveyDetail', params: { id } }) },
+          { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
         Alert.alert('✅ Salvo!', 'Sua pesquisa foi salva com sucesso.', [
@@ -329,7 +329,14 @@ export const CreateSurveyScreen: React.FC = () => {
         ]);
       }
     } catch (err: any) {
-      Alert.alert('Erro ao salvar', err.message ?? 'Não foi possível salvar a pesquisa.');
+      console.error('[saveDraft] ERRO COMPLETO:', JSON.stringify(err), err);
+      // Supabase errors têm .message, mas às vezes vêm como objetos com .details ou .hint
+      const errMsg =
+        err?.message ||
+        err?.details ||
+        err?.hint ||
+        (typeof err === 'string' ? err : 'Não foi possível salvar a pesquisa. Verifique sua conexão.');
+      Alert.alert('Erro ao salvar', errMsg);
     } finally {
       setSavingDraft(false);
       setPublishing(false);
