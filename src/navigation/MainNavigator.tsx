@@ -39,8 +39,30 @@ const SurveysStackNavigator: React.FC = () => {
       }}
     >
       <SurveysStack.Screen name="SurveyList" component={SurveyListScreen} options={{ title: 'Pesquisas' }} />
-      <SurveysStack.Screen name="SurveyDetail" component={SurveyDetailScreen} options={{ title: 'Detalhes' }} />
-      <SurveysStack.Screen name="CreateSurvey" component={CreateSurveyScreen} options={{ title: 'Criar Pesquisa' }} />
+      <SurveysStack.Screen 
+        name="SurveyDetail" 
+        component={SurveyDetailScreen} 
+        options={({ navigation }) => ({ 
+          title: 'Detalhes',
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
+              <Text style={[typography.bodyBold, { color: '#EAF3EE' }]}>{'< Voltar'}</Text>
+            </TouchableOpacity>
+          )
+        })} 
+      />
+      <SurveysStack.Screen 
+        name="CreateSurvey" 
+        component={CreateSurveyScreen} 
+        options={({ navigation }) => ({ 
+          title: 'Criar Pesquisa',
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
+              <Text style={[typography.bodyBold, { color: '#EAF3EE' }]}>{'< Voltar'}</Text>
+            </TouchableOpacity>
+          )
+        })} 
+      />
     </SurveysStack.Navigator>
   );
 };
