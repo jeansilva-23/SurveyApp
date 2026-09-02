@@ -45,8 +45,8 @@ const SurveysStackNavigator: React.FC = () => {
         options={({ navigation }) => ({ 
           title: 'Detalhes',
           headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
-              <Text style={[typography.bodyBold, { color: '#EAF3EE' }]}>{'< Voltar'}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SurveyList')} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
+              <Text style={[{ fontSize: 24, color: '#EAF3EE' }]}>{'←'}</Text>
             </TouchableOpacity>
           )
         })} 
@@ -57,8 +57,8 @@ const SurveysStackNavigator: React.FC = () => {
         options={({ navigation }) => ({ 
           title: 'Criar Pesquisa',
           headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
-              <Text style={[typography.bodyBold, { color: '#EAF3EE' }]}>{'< Voltar'}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SurveyList')} style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[2] }}>
+              <Text style={[{ fontSize: 24, color: '#EAF3EE' }]}>{'←'}</Text>
             </TouchableOpacity>
           )
         })} 
