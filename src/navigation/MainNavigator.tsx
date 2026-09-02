@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { NavigatorScreenParams } from '@react-navigation/native';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SurveyListScreen } from '../screens/surveys/management/SurveyListScreen';
 import { SurveyDetailScreen } from '../screens/surveys/management/SurveyDetailScreen';
@@ -13,7 +14,7 @@ import { spacing } from '../theme/spacing';
 
 export type MainTabParamList = {
   Home: undefined;
-  SurveysTab: undefined;
+  SurveysTab: NavigatorScreenParams<SurveysStackParamList> | undefined;
   CreateSurvey: { surveyId?: string };
   Reports: { surveyId?: string };
 };

@@ -10,7 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -329,10 +329,15 @@ export const CreateSurveyScreen: React.FC = () => {
             {
               text: '📊 Ver pesquisa',
               onPress: () =>
-                navigation.navigate('SurveysTab', {
-                  screen: 'SurveyDetail',
-                  params: { id: id!, openShare: true },
-                }),
+                navigation.dispatch(
+                  CommonActions.navigate({
+                    name: 'SurveysTab',
+                    params: {
+                      screen: 'SurveyDetail',
+                      params: { id: id!, openShare: true },
+                    },
+                  })
+                ),
             },
             { text: 'Continuar editando', style: 'cancel' },
           ]
