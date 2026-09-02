@@ -10,7 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -328,16 +328,20 @@ export const CreateSurveyScreen: React.FC = () => {
           [
             {
               text: '📊 Ver pesquisa',
-              onPress: () =>
-                navigation.dispatch(
-                  CommonActions.navigate({
-                    name: 'SurveysTab',
-                    params: {
-                      screen: 'SurveyDetail',
-                      params: { id: id!, openShare: true },
-                    },
-                  })
-                ),
+              onPress: () => {
+                const navState = navigation.getState();
+                if (navState?.type === 'stack') {
+                  // Já estamos dentro do stack do SurveysTab — navega direto
+                  navigation.navigate('SurveyDetail', { id: id!, openShare: true });
+                } else {
+                  // Estamos na aba "Criar" — precisa trocar de aba primeiro
+                  navigation.navigate('SurveysTab', {
+                    screen: 'SurveyDetail',
+                    params: { id: id!, openShare: true },
+                    initial: false,
+                  });
+                }
+              },
             },
             { text: 'Continuar editando', style: 'cancel' },
           ]
