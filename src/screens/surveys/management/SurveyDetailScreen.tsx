@@ -31,7 +31,7 @@ export const SurveyDetailScreen: React.FC = () => {
   const { id, openShare } = route.params ?? {};
   const [qrModalVisible, setQrModalVisible] = useState(openShare ?? false);
 
-  const { data: survey, isLoading } = useQuery({
+  const { data: survey, isLoading, isError } = useQuery({
     queryKey: ['survey', id],
     queryFn: () => getSurveyById(id),
   });
@@ -59,10 +59,20 @@ export const SurveyDetailScreen: React.FC = () => {
     });
   };
 
-  if (isLoading || !survey) {
+  if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={[typography.body, { color: c.textSecondary }]}>Carregando...</Text>
+      </View>
+    );
+  }
+
+  if (isError || !survey) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center', padding: spacing[4] }]}>
+        <Text style={[typography.h3, { color: c.textPrimary, marginBottom: spacing[2] }]}>Pesquisa não encontrada</Text>
+        <Text style={[typography.body, { color: c.textSecondary, textAlign: 'center', marginBottom: spacing[6] }]}>Não foi possível carregar os detalhes desta pesquisa. Ela pode ter sido excluída.</Text>
+        <Button label="Voltar" onPress={() => navigation.goBack()} />
       </View>
     );
   }

@@ -29,7 +29,7 @@ const linking = {
             path: 'surveys',
             screens: {
               SurveyList: '',
-              SurveyDetail: ':id',
+              SurveyDetail: 'details/:id',
               CreateSurvey: 'new',
             },
           },
