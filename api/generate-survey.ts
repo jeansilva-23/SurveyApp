@@ -38,7 +38,7 @@ Sua tarefa é ler o documento fornecido e criar uma pesquisa de opinião com o o
 de coletar a opinião dos respondentes sobre os pontos mais importantes do conteúdo.
 
 REGRAS:
-1. Gere entre 4 e 8 perguntas variadas e relevantes ao tema.
+1. Gere entre 5 e 10 perguntas variadas e relevantes ao tema.
 2. Use diferentes tipos de pergunta conforme o contexto:
    - "unica_escolha": quando há exatamente uma resposta correta ou preferida.
    - "multipla_escolha": quando o respondente pode escolher mais de uma opção.
@@ -193,7 +193,7 @@ export default async function handler(req: Request): Promise<Response> {
     ],
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       // Nota: responseMimeType é omitido intencionalmente pois alguns modelos
       // ignoram a instrução e retornam texto puro de qualquer forma.
       // Usamos o extractor de JSON robusto no rawText abaixo.
