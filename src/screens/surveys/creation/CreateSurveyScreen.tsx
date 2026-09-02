@@ -217,6 +217,7 @@ export const CreateSurveyScreen: React.FC = () => {
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [publishedId, setPublishedId] = useState<string | null>(null);
 
   const { control, handleSubmit, formState: { errors }, watch, reset, getValues, trigger, setValue } = useForm<SurveyMeta>({
     resolver: zodResolver(surveyMetaSchema),
@@ -320,9 +321,22 @@ export const CreateSurveyScreen: React.FC = () => {
 
       if (publish) {
         await publishSurvey(id!, data.title, existingSurvey?.public_slug);
-        Alert.alert('🎉 Pesquisa publicada!', 'Sua pesquisa está ativa e o link público foi gerado.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        setPublishedId(id!);
+        Alert.alert(
+          '🎉 Pesquisa publicada!',
+          'Sua pesquisa está ao vivo! Compartilhe o link ou QR Code com seus respondentes.',
+          [
+            {
+              text: '📊 Ver pesquisa',
+              onPress: () =>
+                navigation.navigate('SurveysTab', {
+                  screen: 'SurveyDetail',
+                  params: { id: id!, openShare: true },
+                }),
+            },
+            { text: 'Continuar editando', style: 'cancel' },
+          ]
+        );
       } else {
         Alert.alert('✅ Salvo!', 'Sua pesquisa foi salva com sucesso.', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -580,8 +594,20 @@ export const CreateSurveyScreen: React.FC = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelBtn}>
             <Text style={[typography.body, { color: c.textSecondary }]}>← Cancelar</Text>
           </TouchableOpacity>
-          <Button label="Salvar rascunho" variant="outline" loading={savingDraft} onPress={() => handleSave(false)} style={{ flex: 1, marginRight: spacing[3] }} />
-          <Button label="Publicar pesquisa ›" loading={publishing} onPress={() => handleSave(true)} style={{ flex: 1.2 }} />
+          <Button
+            label="Salvar rascunho"
+            variant="outline"
+            loading={savingDraft}
+            onPress={() => handleSave(false)}
+            style={{ flex: 1, marginRight: spacing[3] }}
+          />
+          <Button
+            label={publishedId ? '✅ Publicada' : 'Publicar pesquisa ›'}
+            loading={publishing}
+            disabled={!!publishedId}
+            onPress={() => handleSave(true)}
+            style={{ flex: 1.2, opacity: publishedId ? 0.6 : 1 }}
+          />
         </View>
       </ScrollView>
     </GestureHandlerRootView>
