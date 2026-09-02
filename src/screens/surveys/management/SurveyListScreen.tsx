@@ -85,16 +85,25 @@ export const SurveyListScreen: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteSurvey,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['surveys'] }),
+    onError: () => Alert.alert('Erro ao excluir', 'Não foi possível excluir a pesquisa. Tente novamente.'),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: duplicateSurvey,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['surveys'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] });
+      Alert.alert('✅ Duplicada!', 'Uma cópia da pesquisa foi criada com sucesso.');
+    },
+    onError: () => Alert.alert('Erro ao duplicar', 'Não foi possível duplicar a pesquisa.'),
   });
 
   const closeMutation = useMutation({
     mutationFn: (id: string) => updateSurvey(id, { status: 'encerrada' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['surveys'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys'] });
+      Alert.alert('⏹ Encerrada', 'A pesquisa foi encerrada com sucesso.');
+    },
+    onError: () => Alert.alert('Erro ao encerrar', 'Não foi possível encerrar a pesquisa.'),
   });
 
   const filtered = surveys.filter((s) => {
@@ -104,10 +113,19 @@ export const SurveyListScreen: React.FC = () => {
   });
 
   const handleDelete = (survey: Survey) => {
-    Alert.alert('Excluir pesquisa', `Deseja excluir "${survey.title}" permanentemente?`, [
+    Alert.alert('Excluir pesquisa', `Deseja excluir "${survey.title}" permanentemente? Esta ação não pode ser desfeita.`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(survey.id) },
     ]);
+  };
+
+  const handleShare = (survey: Survey) => {
+    if (!survey.public_slug) {
+      Alert.alert('Pesquisa não publicada', 'Publique a pesquisa primeiro para gerar o link e o QR Code.');
+      return;
+    }
+    navigation.navigate('SurveyDetail', { id: survey.id, openShare: true });
+    setSelectedSurvey(null);
   };
 
   return (
@@ -183,13 +201,46 @@ export const SurveyListScreen: React.FC = () => {
               {selectedSurvey?.title}
             </Text>
             {[
-              { label: '✏️  Editar', action: () => { navigation.navigate('CreateSurvey', { surveyId: selectedSurvey?.id }); setSelectedSurvey(null); } },
-              { label: '📋  Duplicar', action: () => { if (selectedSurvey) duplicateMutation.mutate(selectedSurvey); setSelectedSurvey(null); } },
-              { label: '🔗  Compartilhar / QRCode', action: () => { navigation.navigate('SurveyDetail', { id: selectedSurvey?.id, openShare: true }); setSelectedSurvey(null); } },
-              { label: '⏹  Encerrar', action: () => { if (selectedSurvey) closeMutation.mutate(selectedSurvey.id); setSelectedSurvey(null); } },
-              { label: '🗑  Excluir', action: () => { if (selectedSurvey) handleDelete(selectedSurvey); setSelectedSurvey(null); }, danger: true },
+              {
+                label: '✏️  Editar',
+                testID: 'menu-edit',
+                action: () => { navigation.navigate('CreateSurvey', { surveyId: selectedSurvey?.id }); setSelectedSurvey(null); },
+              },
+              {
+                label: '📋  Duplicar',
+                testID: 'menu-duplicate',
+                action: () => { if (selectedSurvey) duplicateMutation.mutate(selectedSurvey); setSelectedSurvey(null); },
+              },
+              {
+                label: '🔗  Compartilhar / QRCode',
+                testID: 'menu-share',
+                action: () => { if (selectedSurvey) handleShare(selectedSurvey); },
+              },
+              // "Encerrar" só faz sentido para pesquisas ativas
+              ...(selectedSurvey?.status === 'ativa' ? [{
+                label: '⏹  Encerrar',
+                testID: 'menu-close',
+                action: () => { if (selectedSurvey) closeMutation.mutate(selectedSurvey.id); setSelectedSurvey(null); },
+                danger: false,
+              }] : []),
+              {
+                label: '🗑  Excluir',
+                testID: 'menu-delete',
+                // Fecha o modal primeiro e mostra o Alert após 400ms (evita supressão do Alert pela animação do Modal)
+                action: () => {
+                  const survey = selectedSurvey!;
+                  setSelectedSurvey(null);
+                  setTimeout(() => handleDelete(survey), 400);
+                },
+                danger: true,
+              },
             ].map((opt) => (
-              <TouchableOpacity key={opt.label} style={[styles.modalOption, { borderBottomColor: c.divider }]} onPress={opt.action}>
+              <TouchableOpacity
+                key={opt.label}
+                testID={opt.testID}
+                style={[styles.modalOption, { borderBottomColor: c.divider }]}
+                onPress={opt.action}
+              >
                 <Text style={[typography.body, { color: opt.danger ? c.error : c.textPrimary }]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}

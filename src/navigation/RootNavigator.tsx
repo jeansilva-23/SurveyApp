@@ -25,7 +25,15 @@ const linking = {
         path: '',
         screens: {
           Home: '',
-          SurveysTab: 'surveys',
+          SurveysTab: {
+            path: 'surveys',
+            screens: {
+              SurveyList: '',
+              SurveyDetail: ':id',
+              CreateSurvey: 'new',
+            },
+          },
+          CreateSurvey: 'create',
           Reports: 'reports',
         },
       },
