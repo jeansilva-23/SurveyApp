@@ -1,5 +1,5 @@
 /**
- * Tipos compartilhados para a integração de IA (Gemini)
+ * Tipos compartilhados para a integração de IA
  * usados tanto no app quanto na Vercel Serverless Function.
  */
 

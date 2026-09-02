@@ -19,9 +19,17 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 /** Tipos de arquivo aceitos pela API. */
 const ALLOWED_MIME_TYPES = ['application/pdf', 'text/plain', 'text/markdown'];
 
-/** URL da API Gemini (REST direto, compatível com Edge Runtime). */
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+/**
+ * Ordem de preferência dos modelos.
+ * Se o primeiro retornar 503 (overloaded), tentamos o próximo automaticamente.
+ */
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',      // Mais estável — tentativa primária
+  'gemini-flash-latest',   // Alias do Google que aponta para o Flash mais recente disponível
+  'gemini-3.1-flash-lite', // Modelo leve — rápido e raramente sobrecarregado
+];
+
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // ---------- Prompt ----------
 
@@ -58,6 +66,38 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido, sem nenhum texto antes ou depois,
     }
   ]
 }`;
+
+// ---------- Helpers ----------
+
+/**
+ * Tenta extrair um JSON válido de uma string que pode conter
+ * blocos de markdown, texto antes/depois, etc.
+ */
+function extractJSON(raw: string): string {
+  // 1) Remove blocos de markdown: ```json ... ``` ou ``` ... ```
+  let cleaned = raw.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+
+  // 2) Encontra o primeiro '{' e o último '}' para isolar o objeto JSON
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    cleaned = cleaned.slice(start, end + 1);
+  }
+
+  return cleaned;
+}
+
+/**
+ * Chama um modelo específico do Gemini e retorna o Response do fetch.
+ * Não lança exceção — retorna o Response bruto para o chamador decidir.
+ */
+async function callGemini(model: string, payload: unknown, apiKey: string): Promise<Response> {
+  return fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
 
 // ---------- Handler ----------
 
@@ -154,34 +194,57 @@ export default async function handler(req: Request): Promise<Response> {
     generationConfig: {
       temperature: 0.4,
       maxOutputTokens: 2048,
-      responseMimeType: 'application/json',
+      // Nota: responseMimeType é omitido intencionalmente pois alguns modelos
+      // ignoram a instrução e retornam texto puro de qualquer forma.
+      // Usamos o extractor de JSON robusto no rawText abaixo.
     },
   };
 
-  // Chama o Gemini
-  let geminiResponse: Response;
-  try {
-    geminiResponse = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiPayload),
-    });
-  } catch (networkError) {
-    console.error('[generate-survey] Erro de rede ao chamar Gemini:', networkError);
+  // ---------- Chama o Gemini com fallback automático entre modelos ----------
+  let geminiResponse: Response | null = null;
+  let usedModel = '';
+  let lastError = '';
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      console.log(`[generate-survey] Tentando modelo: ${model}`);
+      const res = await callGemini(model, geminiPayload, apiKey);
+
+      if (res.ok) {
+        geminiResponse = res;
+        usedModel = model;
+        break;
+      }
+
+      const errText = await res.text();
+      console.warn(`[generate-survey] Modelo ${model} retornou ${res.status}:`, errText);
+      lastError = `${res.status} — ${errText}`;
+
+      // Se for 503 (overloaded) ou 429 (rate limit), tenta o próximo modelo
+      // Para outros erros (400, 401, 404...) interrompe o loop — são erros de config
+      if (res.status !== 503 && res.status !== 429) {
+        break;
+      }
+    } catch (networkError) {
+      console.warn(`[generate-survey] Erro de rede com modelo ${model}:`, networkError);
+      lastError = String(networkError);
+      // Tenta o próximo modelo
+    }
+  }
+
+  if (!geminiResponse) {
+    console.error('[generate-survey] Todos os modelos falharam. Último erro:', lastError);
     return Response.json(
-      { success: false, error: 'Não foi possível conectar ao serviço de IA.' },
+      {
+        success: false,
+        error:
+          'O serviço de IA está temporariamente sobrecarregado. Aguarde alguns instantes e tente novamente.',
+      },
       { status: 502, headers: corsHeaders }
     );
   }
 
-  if (!geminiResponse.ok) {
-    const errorText = await geminiResponse.text();
-    console.error('[generate-survey] Gemini retornou erro:', geminiResponse.status, errorText);
-    return Response.json(
-      { success: false, error: `Erro no serviço de IA (${geminiResponse.status}).` },
-      { status: 502, headers: corsHeaders }
-    );
-  }
+  console.log(`[generate-survey] Sucesso com modelo: ${usedModel}`);
 
   // Extrai o conteúdo gerado
   const geminiData = await geminiResponse.json();
@@ -196,14 +259,14 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  // Parse do JSON gerado pelo Gemini
+  // Parse do JSON gerado pelo Gemini (com extractor robusto)
   let surveyData: { title: string; description: string; questions: unknown[] };
   try {
-    // Remove eventuais blocos markdown (```json ... ```) que o modelo possa retornar
-    const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const cleaned = extractJSON(rawText);
+    console.log('[generate-survey] JSON extraído (primeiros 200 chars):', cleaned.slice(0, 200));
     surveyData = JSON.parse(cleaned);
   } catch (parseError) {
-    console.error('[generate-survey] Falha ao fazer parse do JSON da IA:', rawText);
+    console.error('[generate-survey] Falha ao fazer parse do JSON da IA. Raw:', rawText);
     return Response.json(
       { success: false, error: 'A IA retornou um formato inválido. Tente novamente.' },
       { status: 502, headers: corsHeaders }

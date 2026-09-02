@@ -72,7 +72,7 @@ async function readFileAsBase64(uri: string): Promise<string> {
 
 /**
  * Abre o seletor de arquivos, valida o arquivo escolhido,
- * envia para o Gemini via Vercel Edge Function e retorna
+ * envia para a IA via Vercel Edge Function e retorna
  * a pesquisa gerada pronta para uso.
  *
  * @throws {Error} com mensagem amigável em português se algo der errado.

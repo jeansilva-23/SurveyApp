@@ -362,7 +362,7 @@ export const CreateSurveyScreen: React.FC = () => {
     await saveDraft(data, publish);
   };
 
-  /** Gera a pesquisa a partir de um arquivo usando o Gemini via Vercel Edge Function. */
+  /** Gera a pesquisa a partir de um arquivo usando IA via Vercel Edge Function. */
   const handleGenerateWithAI = async () => {
     try {
       setIsGenerating(true);
@@ -464,7 +464,7 @@ export const CreateSurveyScreen: React.FC = () => {
               <ActivityIndicator color="#FFF" style={{ marginRight: spacing[3] }} />
               <View>
                 <Text style={[typography.labelLarge, { color: c.primaryDark }]}>Processando documento...</Text>
-                <Text style={[typography.caption, { color: c.textSecondary }]}>O Gemini está lendo e criando as perguntas</Text>
+                <Text style={[typography.caption, { color: c.textSecondary }]}>A IA está lendo e criando as perguntas</Text>
               </View>
             </>
           ) : (
@@ -472,7 +472,7 @@ export const CreateSurveyScreen: React.FC = () => {
               <Text style={styles.aiEmoji}>✨</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[typography.labelLarge, { color: '#FFF' }]}>Gerar pesquisa com Inteligência Artificial</Text>
-                <Text style={[typography.caption, { color: 'rgba(255,255,255,0.75)' }]}>Anexe um PDF ou TXT e o Gemini cria a pesquisa automaticamente</Text>
+                <Text style={[typography.caption, { color: 'rgba(255,255,255,0.75)' }]}>Anexe um PDF ou TXT e a IA cria a pesquisa automaticamente</Text>
               </View>
               <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }}>›</Text>
             </>
