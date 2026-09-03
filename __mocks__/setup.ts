@@ -70,9 +70,11 @@ jest.mock('expo-document-picker', () => ({
 }));
 
 /**
- * Mock do expo-file-system — usado na leitura dos arquivos em Base64.
+ * Mock do expo-file-system — usado na leitura dos arquivos em Base64 e na escrita do CSV.
  */
 jest.mock('expo-file-system', () => ({
   readAsStringAsync: jest.fn().mockResolvedValue('dGVzdGVCYXNlNjQ='), // "testeBase64" em base64
+  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
+  cacheDirectory: 'file:///cache/',
   EncodingType: { Base64: 'base64', UTF8: 'utf8' },
 }));

@@ -216,17 +216,16 @@ export const getDashboardStats = async () => {
 
   const active = surveys.filter((s) => s.status === 'ativa').length;
   const totalResponses = responses.length;
-  const completionRate =
-    surveys.length > 0
-      ? Math.round(
-          (surveys.reduce((sum, s) => sum + (s.response_count ?? 0), 0) / (surveys.length * 100)) *
-            100
-        )
-      : 0;
+  // % de pesquisas ativas que já receberam pelo menos 1 resposta
+  const activeSurveysWithResponses = surveys.filter(
+    (s) => s.status === 'ativa' && (s.response_count ?? 0) > 0
+  ).length;
+  const completionRate = active > 0 ? Math.round((activeSurveysWithResponses / active) * 100) : 0;
 
   return {
     totalResponses,
     activeSurveys: active,
+    activeSurveysWithResponses,
     totalSurveys: surveys.length,
     completionRate: Math.min(completionRate, 100),
     surveys,

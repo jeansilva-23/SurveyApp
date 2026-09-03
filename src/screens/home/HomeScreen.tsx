@@ -239,10 +239,9 @@ export const HomeScreen: React.FC = () => {
       </View>
       <View style={[styles.metricsGrid, { marginTop: 0 }]}>
         <MetricCard
-          title="TAXA DE CONCLUSÃO"
-          value={`${data?.completionRate ?? 0}%`}
-          trend="+5% vs mês anterior"
-          trendUp
+          title="PESQUISAS RESPONDIDAS"
+          value={`${data?.activeSurveysWithResponses ?? 0} de ${data?.activeSurveys ?? 0}`}
+          subtitle="pesquisas ativas com respostas"
           style={{ flex: 1, marginRight: spacing[2] }}
         />
         <MetricCard

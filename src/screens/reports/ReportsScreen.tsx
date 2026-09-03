@@ -9,12 +9,10 @@ import {
   Modal,
   FlatList,
   TextInput,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { Paths, File } from 'expo-file-system';
 import { useTheme } from '../../theme';
 import { spacing, borderRadius, shadow } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -22,6 +20,34 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Select } from '../../components/common/Select';
 import { getSurveys, getResponses, getQuestions } from '../../services/surveyService';
+
+// ---- Helpers de exportação multiplataforma ----
+
+/** Baixa um arquivo no browser via Blob */
+function webDownload(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** Abre o HTML em nova aba e aciona window.print() no browser */
+function webPrintHtml(html: string) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    Alert.alert('Erro', 'Permita pop-ups para exportar o relatório.');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
 
 // ---- Simple bar chart (SVG) ----
 const BarChart: React.FC<{
@@ -108,7 +134,7 @@ export const ReportsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>(route.params?.surveyId ?? '');
   const [period, setPeriod] = useState(30);
-  const [chartType, setChartType] = useState<ChartType>('Barras');
+  const [chartType, setChartType] = useState<ChartType>('Horizontal');
   const [exporting, setExporting] = useState(false);
   const [surveyModalVisible, setSurveyModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,13 +144,13 @@ export const ReportsScreen: React.FC = () => {
     queryFn: () => getSurveys(),
   });
 
-  const { data: responses = [] } = useQuery({
+  const { data: responses = [], isLoading: loadingResponses, error: responsesError } = useQuery({
     queryKey: ['responses', selectedSurveyId],
     queryFn: () => getResponses(selectedSurveyId),
     enabled: !!selectedSurveyId,
   });
 
-  const { data: questions = [] } = useQuery({
+  const { data: questions = [], isLoading: loadingQuestions } = useQuery({
     queryKey: ['questions', selectedSurveyId],
     queryFn: () => getQuestions(selectedSurveyId),
     enabled: !!selectedSurveyId,
@@ -136,7 +162,14 @@ export const ReportsScreen: React.FC = () => {
     if (!period) return responses;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - period);
-    return responses.filter((r) => new Date(r.submitted_at ?? '') >= cutoff);
+    return responses.filter((r) => {
+      // submitted_at nulo → considerar como válido (inclui na listagem)
+      if (!r.submitted_at) return true;
+      const submittedAt = new Date(r.submitted_at);
+      // Protege contra datas inválidas
+      if (isNaN(submittedAt.getTime())) return true;
+      return submittedAt >= cutoff;
+    });
   }, [responses, period]);
 
   // Aggregate answers per question option
@@ -157,50 +190,114 @@ export const ReportsScreen: React.FC = () => {
     return map;
   }, [filteredResponses]);
 
+  const buildReportHtml = () => {
+    const questionsHtml = questions.map((q, qi) => {
+      const optionsMap = aggregated[q.id] ?? {};
+      const entries = Object.entries(optionsMap);
+      const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+      const isText = q.type === 'texto_curto' || q.type === 'texto_longo';
+
+      const rowsHtml = entries.length === 0
+        ? '<tr><td colspan="3" style="color:#999;font-style:italic">Sem respostas</td></tr>'
+        : entries
+            .sort(([, a], [, b]) => (b as number) - (a as number))
+            .map(([label, count]) => {
+              const pct = (((count as number) / total) * 100).toFixed(1);
+              return `<tr><td>${label}</td><td style="text-align:center">${count}</td><td style="text-align:center">${pct}%</td></tr>`;
+            })
+            .join('');
+
+      return `<div class="question"><h3>${qi + 1}. ${q.title}</h3><span class="badge-sm">${isText ? 'Texto livre' : q.type}</span><table><thead><tr><th>Resposta</th><th>Contagem</th><th>%</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+    }).join('');
+
+    return `<html><head><meta charset="utf-8"><style>
+      body{font-family:Arial,sans-serif;padding:32px;color:#1A2622;}
+      h1{color:#0F3D2E;margin-bottom:4px;}h2{color:#1B5E42;font-size:14px;margin:4px 0 16px;}
+      h3{color:#1B5E42;font-size:13px;margin:0 0 4px;}
+      .badge{display:inline-block;background:#34A85A;color:white;padding:2px 10px;border-radius:12px;font-size:12px;margin-bottom:8px;}
+      .badge-sm{display:inline-block;background:#EAF3EE;color:#1B5E42;padding:1px 6px;border-radius:8px;font-size:10px;margin-bottom:6px;}
+      .question{margin-top:24px;border-top:1px solid #E8EDEA;padding-top:16px;}
+      .meta{color:#666;font-size:12px;margin:12px 0;}
+      table{width:100%;border-collapse:collapse;margin-top:8px;}
+      td,th{border:1px solid #E8EDEA;padding:8px;font-size:12px;}
+      th{background:#EAF3EE;text-align:left;}
+      .footer{margin-top:32px;border-top:1px solid #E8EDEA;padding-top:12px;font-size:11px;color:#999;}
+    </style></head><body>
+      <h1>${selectedSurvey!.title}</h1>
+      <span class="badge">${selectedSurvey!.status}</span>
+      <p class="meta">${selectedSurvey!.description ?? ''}</p>
+      <h2>Total de respostas no período: ${filteredResponses.length}</h2>
+      ${questionsHtml}
+      <div class="footer">Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} pelo SurveyApp</div>
+    </body></html>`;
+  };
+
+  const buildCsvContent = () => {
+    const header = 'id,respondent_id,respondent_name,source,submitted_at';
+    const questionHeaders = questions.map((q) => `"${q.title.replace(/"/g, '""')}"`).join(',');
+    const fullHeader = questions.length > 0 ? `${header},${questionHeaders}` : header;
+
+    const rows = filteredResponses.map((r: any) => {
+      const base = `${r.id},${r.respondent_id ?? ''},"${(r.respondent_name ?? '').replace(/"/g, '""')}",${r.source ?? ''},${r.submitted_at ?? ''}`;
+      if (questions.length === 0) return base;
+      const answerMap: Record<string, string> = {};
+      (r.survey_answers ?? []).forEach((a: any) => {
+        const val = Array.isArray(a.answer_value) ? a.answer_value.join('; ') : String(a.answer_value ?? '');
+        answerMap[a.question_id] = val;
+      });
+      const answerCols = questions.map((q) => `"${(answerMap[q.id] ?? '').replace(/"/g, '""')}"`).join(',');
+      return `${base},${answerCols}`;
+    }).join('\n');
+
+    return `${fullHeader}\n${rows}`;
+  };
+
   const handleExportPDF = async () => {
     if (!selectedSurvey) return;
     try {
       setExporting(true);
-      const html = `
-        <html><head><style>
-          body { font-family: Arial; padding: 32px; color: #1A2622; }
-          h1 { color: #0F3D2E; } h2 { color: #1B5E42; font-size: 14px; }
-          .badge { display: inline-block; background: #34A85A; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          td, th { border: 1px solid #E8EDEA; padding: 8px; font-size: 12px; }
-          th { background: #EAF3EE; }
-        </style></head><body>
-          <h1>${selectedSurvey.title}</h1>
-          <p class="badge">${selectedSurvey.status}</p>
-          <p>${selectedSurvey.description ?? ''}</p>
-          <h2>Total de respostas: ${filteredResponses.length}</h2>
-          <p>Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} pelo SurveyApp</p>
-        </body></html>
-      `;
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
+      const html = buildReportHtml();
+
+      if (Platform.OS === 'web') {
+        // Browser: abre nova aba com o HTML e aciona impressão
+        webPrintHtml(html);
+      } else {
+        // Mobile: gera PDF via expo-print e compartilha
+        const { default: Print } = await import('expo-print');
+        const { default: Sharing } = await import('expo-sharing');
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Relatório — ${selectedSurvey.title}` });
+      }
     } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      Alert.alert('Erro ao exportar relatório', err.message);
     } finally {
       setExporting(false);
     }
   };
 
   const handleExportCSV = async () => {
-    if (!selectedSurvey || filteredResponses.length === 0) return;
+    if (!selectedSurvey || filteredResponses.length === 0) {
+      Alert.alert('Aviso', 'Não há respostas para exportar no período selecionado.');
+      return;
+    }
     try {
       setExporting(true);
-      const header = 'id,respondent_id,respondent_name,source,submitted_at\n';
-      const rows = filteredResponses.map((r) =>
-        `${r.id},${r.respondent_id ?? ''},${r.respondent_name ?? ''},${r.source},${r.submitted_at}`
-      ).join('\n');
-      const csv = header + rows;
-      const path = `${Paths.cache}relatorio-${Date.now()}.csv`;
-      const file = new File(path);
-      await file.create();
-      await Sharing.shareAsync(path, { mimeType: 'text/csv' });
+      const csv = buildCsvContent();
+      const filename = `relatorio-${selectedSurvey.title.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.csv`;
+
+      if (Platform.OS === 'web') {
+        // Browser: download via Blob
+        webDownload(csv, filename, 'text/csv;charset=utf-8;');
+      } else {
+        // Mobile: salva em arquivo e compartilha
+        const FileSystem = await import('expo-file-system');
+        const { default: Sharing } = await import('expo-sharing');
+        const path = `${FileSystem.cacheDirectory}${filename}`;
+        await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
+        await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: `Relatório CSV — ${selectedSurvey.title}` });
+      }
     } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      Alert.alert('Erro ao exportar CSV', err.message);
     } finally {
       setExporting(false);
     }
@@ -299,15 +396,61 @@ export const ReportsScreen: React.FC = () => {
           <View style={styles.metricsRow}>
             <Card style={{ flex: 1, marginRight: spacing[3] }}>
               <Text style={[typography.overline, { color: c.textSecondary }]}>TOTAL DE VOTOS</Text>
-              <Text style={[typography.displayMedium, { color: c.textPrimary }]}>{filteredResponses.length}</Text>
+              {loadingResponses
+                ? <Text style={[typography.displayMedium, { color: c.textSecondary }]}>…</Text>
+                : <Text style={[typography.displayMedium, { color: c.textPrimary }]}>{filteredResponses.length}</Text>
+              }
             </Card>
             <Card style={{ flex: 1 }}>
-              <Text style={[typography.overline, { color: c.textSecondary }]}>PARTICIPAÇÃO</Text>
-              <Text style={[typography.displayMedium, { color: c.textPrimary }]}>
-                {selectedSurvey.response_count ? `${Math.min(Math.round((filteredResponses.length / selectedSurvey.response_count) * 100), 100)}%` : '—'}
-              </Text>
+              <Text style={[typography.overline, { color: c.textSecondary }]}>ÚLTIMA RESPOSTA</Text>
+              {loadingResponses
+                ? <Text style={[typography.displayMedium, { color: c.textSecondary }]}>…</Text>
+                : (() => {
+                    const latest = filteredResponses
+                      .map((r: any) => r.submitted_at ? new Date(r.submitted_at) : null)
+                      .filter(Boolean)
+                      .sort((a: any, b: any) => b - a)[0];
+                    if (!latest) return (
+                      <Text style={[typography.displayMedium, { color: c.textSecondary }]}>—</Text>
+                    );
+                    const diffMs = Date.now() - latest.getTime();
+                    const diffMin = Math.floor(diffMs / 60000);
+                    const diffH = Math.floor(diffMin / 60);
+                    const diffD = Math.floor(diffH / 24);
+                    let label: string;
+                    if (diffMin < 1) label = 'agora';
+                    else if (diffMin < 60) label = `${diffMin}min`;
+                    else if (diffH < 24) label = `${diffH}h`;
+                    else if (diffD === 1) label = 'ontem';
+                    else if (diffD < 30) label = `${diffD}d`;
+                    else label = latest.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                    return (
+                      <Text style={[typography.displayMedium, { color: c.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>
+                        {label}
+                      </Text>
+                    );
+                  })()
+              }
             </Card>
           </View>
+
+          {/* Aviso: período pode estar filtrando respostas */}
+          {!loadingResponses && responses.length > 0 && filteredResponses.length === 0 && (
+            <Card style={{ marginTop: spacing[3], backgroundColor: '#FFF8E1' }}>
+              <Text style={[typography.bodySmall, { color: '#856404' }]}>
+                ⚠️ Existem {responses.length} resposta(s) mas o período selecionado está filtrando todas. Tente mudar para "Todos".
+              </Text>
+            </Card>
+          )}
+
+          {/* Erro ao carregar respostas */}
+          {responsesError && (
+            <Card style={{ marginTop: spacing[3], backgroundColor: '#FFF0F0' }}>
+              <Text style={[typography.bodySmall, { color: '#c0392b' }]}>
+                ❌ Erro ao carregar respostas: {(responsesError as any)?.message ?? 'Tente novamente.'}
+              </Text>
+            </Card>
+          )}
 
           {/* Period + Chart type selectors */}
           <Card style={{ marginTop: spacing[3] }}>
